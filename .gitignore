@@ -1,11 +1,25 @@
-# Archivos temporales
-*.log
-*.tmp
-.venv/
-venv/
-.vscode/
-.idea/
+.venv
 __pycache__/
 *.pyc
-.DS_Store
-Thumbs.db
+.venv/
+.vscode/
+procesado/
+*.csv
+*.png
+*.jpg
+
+
+
+*.duckdb
+*.db
+artifacts/
+
+# DuckDB
+*.duckdb
+*.duckdb.wal
+*.duckdb-shm
+*.wal
+*.tmp
+data/*.duckdb*
+data/*.wal
+data/exoplanets.duckdb
