@@ -170,3 +170,92 @@ SELECT
   'validity_range' AS check_type,
   SUM(CASE WHEN pl_orbper IS NOT NULL AND pl_orbper <= 0 THEN 1 ELSE 0 END)::BIGINT AS metric_value
 FROM raw_ps;
+```
+
+## Decisión W04A — Reescritura de consultas para reducir costo
+
+- Fecha: 2026-05-26
+- Decisión: Usar consultas que lean solo las columnas necesarias y aplicar filtros antes de agrupar o unir tablas.
+- Razón: En los planes `EXPLAIN`, el costo principal aparece en `SEQ_SCAN`, `HASH_JOIN` y `HASH_GROUP_BY`. Reducir columnas y filtrar temprano disminuye el trabajo del motor.
+- Evidencia:
+  - Se analizó una consulta métrica por década usando `disc_year` y `pl_orbper`.
+  - Se analizó una consulta con JOIN entre `fact_planet` y `dim_host_full` usando `hostname`.
+  - Se exportó evidencia a `artifacts/w04a_explain_q1.txt`.
+
+Query de evidencia:
+
+```sql
+EXPLAIN
+SELECT
+  FLOOR(disc_year / 10) * 10 AS decade,
+  COUNT(*) AS n_planets,
+  ROUND(AVG(pl_orbper), 2) AS avg_orbital_period
+FROM fact_planet
+WHERE disc_year IS NOT NULL
+  AND disc_year >= 2000
+  AND pl_orbper IS NOT NULL
+GROUP BY decade
+ORDER BY decade ASC;
+```
+
+## Decisión W05A — Uso de surrogate key y FK
+
+- Fecha: 2026-05-26
+- Decisión: Usar `host_id` como surrogate key en `dim_host_sk` y como foreign key en `fact_planet_sk`.
+- Razón: Usar una llave entera estable facilita los JOINs y permite separar la llave técnica (`host_id`) de la llave natural (`hostname`).
+- Evidencia:
+  - `dim_host_sk` tiene `host_id PRIMARY KEY`.
+  - `hostname` es `NOT NULL UNIQUE`.
+  - `fact_planet_sk.host_id` referencia `dim_host_sk(host_id)`.
+  - Se validó que `orphan_rows = 0`.
+
+Query de evidencia:
+
+```sql
+SELECT COUNT(*) AS orphan_rows
+FROM fact_planet_sk f
+LEFT JOIN dim_host_sk d
+  ON f.host_id = d.host_id
+WHERE d.host_id IS NULL;
+```
+
+## Decisión W05B — Gold outputs y métricas seleccionadas
+
+- Fecha: 2026-05-26
+- Decisión: Crear dos outputs Gold: `gold_by_discoverymethod` y `gold_by_host`.
+- Razón: `gold_by_discoverymethod` permite comparar métodos de detección, mientras que `gold_by_host` permite analizar sistemas planetarios múltiples.
+- Métricas seleccionadas:
+  - `n_planets`
+  - `avg_radius`
+  - `avg_mass`
+  - `first_year`
+  - `last_year`
+- Evidencia:
+  - Se exportó `artifacts/gold_by_discoverymethod.csv`.
+  - Se exportó `artifacts/gold_by_host.csv`.
+  
+
+## Decisión W06B — Métrica y umbral para ejecución del runner
+
+- Fecha: 2026-05-26
+- Decisión: Usar el tiempo de ejecución por etapa del runner W06B como métrica de control del pipeline.
+- Métrica definida: duración de cada etapa en segundos, reportada en `artifacts/w06b_run_report.json`.
+- Umbral definido: cada etapa debe tardar menos de `5` segundos en una ejecución local normal.
+- Razón: Este umbral permite detectar rápidamente si una etapa del pipeline se vuelve anormalmente lenta o si aparece un problema de performance.
+- Evidencia:
+  - Se generó `artifacts/w06b_run_report.json`.
+  - Se generó `artifacts/w06b_stage_timings.csv`.
+  - Se revisó la lista de tiempos por etapa usando Python.
+
+Código de evidencia:
+
+```python
+import json
+from pathlib import Path
+
+report = json.loads(Path("artifacts/w06b_run_report.json").read_text(encoding="utf-8"))
+
+[(s["mode"], s["seconds"]) for s in report["stages"]]
+```
+
+- Conclusión: El reporte permite identificar qué etapa fue más lenta, comparar ejecuciones futuras y detectar cambios inesperados en el rendimiento del pipeline.
