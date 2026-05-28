@@ -2,6 +2,7 @@
 from pathlib import Path
 import time
 import duckdb
+import pandas as pd
 
 
 def sql_quote(s: str) -> str:
@@ -16,7 +17,7 @@ def run_pipeline(project_root: Path) -> dict:
     artifacts_dir = project_root / "artifacts"
 
     raw_csv = raw_dir / "pscomppars.csv"
-    db_path = data_dir / "exoplanets_w06b.duckdb"
+    db_path = data_dir / "exoplanets.duckdb"
 
     artifacts_dir.mkdir(parents=True, exist_ok=True)
 
@@ -40,12 +41,7 @@ def run_pipeline(project_root: Path) -> dict:
         """)
 
     def silver():
-        con.execute("DROP TABLE IF EXISTS fact_planet_sk")
-        con.execute("DROP TABLE IF EXISTS dim_host_sk")
-        con.execute("DROP TABLE IF EXISTS fact_planet")
-        con.execute("DROP TABLE IF EXISTS dim_host_full")
         con.execute("DROP TABLE IF EXISTS silver_planet")
-
         con.execute("""
         CREATE TABLE silver_planet AS
         SELECT
@@ -74,6 +70,7 @@ def run_pipeline(project_root: Path) -> dict:
         """)
 
     def dims():
+        con.execute("DROP TABLE IF EXISTS dim_host_sk")
         con.execute("DROP TABLE IF EXISTS dim_host_full")
 
         con.execute("""
@@ -91,20 +88,7 @@ def run_pipeline(project_root: Path) -> dict:
         """)
 
         con.execute("""
-        CREATE TABLE dim_host_sk (
-          host_id INTEGER PRIMARY KEY,
-          hostname VARCHAR NOT NULL UNIQUE,
-          sy_dist DOUBLE,
-          ra DOUBLE,
-          dec DOUBLE,
-          st_teff DOUBLE,
-          st_rad DOUBLE,
-          st_mass DOUBLE
-        )
-        """)
-
-        con.execute("""
-        INSERT INTO dim_host_sk
+        CREATE TABLE dim_host_sk AS
         SELECT
           ROW_NUMBER() OVER (ORDER BY hostname) AS host_id,
           hostname,
@@ -118,6 +102,7 @@ def run_pipeline(project_root: Path) -> dict:
         """)
 
     def facts():
+        con.execute("DROP TABLE IF EXISTS fact_planet_sk")
         con.execute("DROP TABLE IF EXISTS fact_planet")
 
         con.execute("""
@@ -135,20 +120,7 @@ def run_pipeline(project_root: Path) -> dict:
         """)
 
         con.execute("""
-        CREATE TABLE fact_planet_sk (
-          pl_name VARCHAR PRIMARY KEY,
-          host_id INTEGER NOT NULL REFERENCES dim_host_sk(host_id),
-          discoverymethod VARCHAR,
-          disc_year INTEGER,
-          pl_orbper DOUBLE,
-          pl_rade DOUBLE,
-          pl_bmasse DOUBLE,
-          pl_eqt DOUBLE
-        )
-        """)
-
-        con.execute("""
-        INSERT INTO fact_planet_sk
+        CREATE TABLE fact_planet_sk AS
         SELECT
           f.pl_name,
           d.host_id,
@@ -212,7 +184,6 @@ def run_pipeline(project_root: Path) -> dict:
     stage("export", export)
 
     n_fact = con.execute("SELECT COUNT(*) FROM fact_planet_sk").fetchone()[0]
-
     orphan_rows = con.execute("""
     SELECT COUNT(*)
     FROM fact_planet_sk f
@@ -221,19 +192,12 @@ def run_pipeline(project_root: Path) -> dict:
     WHERE d.host_id IS NULL
     """).fetchone()[0]
 
-    n_dim, n_keys = con.execute("""
-    SELECT COUNT(*) AS n_rows, COUNT(DISTINCT hostname) AS n_keys
-    FROM dim_host_sk
-    """).fetchone()
-
     con.close()
 
     return {
         "stages": stages,
         "checks": {
             "n_fact_sk": n_fact,
-            "orphan_rows": orphan_rows,
-            "dim_host_rows": n_dim,
-            "dim_host_keys": n_keys
+            "orphan_rows": orphan_rows
         }
     }

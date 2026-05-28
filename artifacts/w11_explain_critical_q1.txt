@@ -1,0 +1,82 @@
+┌─────────────────────────────────────┐
+│┌───────────────────────────────────┐│
+││    Query Profiling Information    ││
+│└───────────────────────────────────┘│
+└─────────────────────────────────────┘
+EXPLAIN ANALYZE  WITH wide AS (   SELECT *   FROM silver_planet_v3   WHERE disc_year_int >= 2010 ) SELECT   discoverymethod_canon,   COUNT(*) AS n_planets,   ROUND(AVG(pl_rade), 2) AS avg_radius,   ROUND(AVG(pl_bmasse), 2) AS avg_mass FROM wide WHERE pl_rade IS NOT NULL GROUP BY discoverymethod_canon ORDER BY n_planets DESC 
+┌────────────────────────────────────────────────┐
+│┌──────────────────────────────────────────────┐│
+││              Total Time: 0.0055s             ││
+│└──────────────────────────────────────────────┘│
+└────────────────────────────────────────────────┘
+┌───────────────────────────┐
+│           QUERY           │
+└─────────────┬─────────────┘
+┌─────────────┴─────────────┐
+│      EXPLAIN_ANALYZE      │
+│    ────────────────────   │
+│           0 rows          │
+│          (0.00s)          │
+└─────────────┬─────────────┘
+┌─────────────┴─────────────┐
+│          ORDER_BY         │
+│    ────────────────────   │
+│     count_star() DESC     │
+│                           │
+│          11 rows          │
+│          (0.00s)          │
+└─────────────┬─────────────┘
+┌─────────────┴─────────────┐
+│         PROJECTION        │
+│    ────────────────────   │
+│   discoverymethod_canon   │
+│         n_planets         │
+│         avg_radius        │
+│          avg_mass         │
+│                           │
+│          11 rows          │
+│          (0.00s)          │
+└─────────────┬─────────────┘
+┌─────────────┴─────────────┐
+│       HASH_GROUP_BY       │
+│    ────────────────────   │
+│         Groups: #0        │
+│                           │
+│        Aggregates:        │
+│        count_star()       │
+│          avg(#1)          │
+│          avg(#2)          │
+│                           │
+│          11 rows          │
+│          (0.00s)          │
+└─────────────┬─────────────┘
+┌─────────────┴─────────────┐
+│         PROJECTION        │
+│    ────────────────────   │
+│   discoverymethod_canon   │
+│          pl_rade          │
+│         pl_bmasse         │
+│                           │
+│         5,843 rows        │
+│          (0.00s)          │
+└─────────────┬─────────────┘
+┌─────────────┴─────────────┐
+│         TABLE_SCAN        │
+│    ────────────────────   │
+│           Table:          │
+│      silver_planet_v3     │
+│                           │
+│   Type: Sequential Scan   │
+│                           │
+│        Projections:       │
+│   discoverymethod_canon   │
+│          pl_rade          │
+│         pl_bmasse         │
+│                           │
+│          Filters:         │
+│    disc_year_int>=2010    │
+│   (pl_rade IS NOT NULL)   │
+│                           │
+│         5,843 rows        │
+│          (0.00s)          │
+└───────────────────────────┘

@@ -1,0 +1,13 @@
+{
+  "raw_file": "C:\\Users\\USUARIO WINDOWS\\CODIGOS\\PAZ CD\\data\\raw\\pscomppars.csv",
+  "raw_sha256": "ed67f80f8691b7cd039a659424332eae4802e0fbc9f096a43b107aff91449547",
+  "n_rows": 6291,
+  "n_cols": 16,
+  "checks": {
+    "negative_physical_values": {
+      "negative_orbper": 0,
+      "negative_rade": 0,
+      "negative_bmasse": 0
+    }
+  }
+}

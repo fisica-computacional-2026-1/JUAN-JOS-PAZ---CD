@@ -1,0 +1,106 @@
+┌─────────────────────────────────────┐
+│┌───────────────────────────────────┐│
+││    Query Profiling Information    ││
+│└───────────────────────────────────┘│
+└─────────────────────────────────────┘
+EXPLAIN ANALYZE  WITH joined AS (   SELECT *   FROM silver_planet_v3 p   JOIN dim_host_w11 h     ON p.hostname_canon = h.hostname_canon ) SELECT   hostname_canon,   COUNT(*) AS n_planets,   ROUND(AVG(pl_rade), 2) AS avg_radius,   ROUND(AVG(st_teff), 2) AS avg_st_teff FROM joined WHERE pl_rade IS NOT NULL GROUP BY hostname_canon ORDER BY n_planets DESC LIMIT 15 
+┌────────────────────────────────────────────────┐
+│┌──────────────────────────────────────────────┐│
+││              Total Time: 0.0141s             ││
+│└──────────────────────────────────────────────┘│
+└────────────────────────────────────────────────┘
+┌───────────────────────────┐
+│           QUERY           │
+└─────────────┬─────────────┘
+┌─────────────┴─────────────┐
+│      EXPLAIN_ANALYZE      │
+│    ────────────────────   │
+│           0 rows          │
+│          (0.00s)          │
+└─────────────┬─────────────┘
+┌─────────────┴─────────────┐
+│           TOP_N           │
+│    ────────────────────   │
+│          Top: 15          │
+│                           │
+│         Order By:         │
+│     count_star() DESC     │
+│                           │
+│          15 rows          │
+│          (0.00s)          │
+└─────────────┬─────────────┘
+┌─────────────┴─────────────┐
+│         PROJECTION        │
+│    ────────────────────   │
+│       hostname_canon      │
+│         n_planets         │
+│         avg_radius        │
+│        avg_st_teff        │
+│                           │
+│         4,692 rows        │
+│          (0.00s)          │
+└─────────────┬─────────────┘
+┌─────────────┴─────────────┐
+│       HASH_GROUP_BY       │
+│    ────────────────────   │
+│         Groups: #0        │
+│                           │
+│        Aggregates:        │
+│        count_star()       │
+│          avg(#1)          │
+│          avg(#2)          │
+│                           │
+│         4,692 rows        │
+│          (0.01s)          │
+└─────────────┬─────────────┘
+┌─────────────┴─────────────┐
+│         PROJECTION        │
+│    ────────────────────   │
+│       hostname_canon      │
+│          pl_rade          │
+│          st_teff          │
+│                           │
+│         6,241 rows        │
+│          (0.00s)          │
+└─────────────┬─────────────┘
+┌─────────────┴─────────────┐
+│         PROJECTION        │
+│    ────────────────────   │
+│       hostname_canon      │
+│          pl_rade          │
+│          st_teff          │
+│                           │
+│         6,241 rows        │
+│          (0.00s)          │
+└─────────────┬─────────────┘
+┌─────────────┴─────────────┐
+│         HASH_JOIN         │
+│    ────────────────────   │
+│      Join Type: INNER     │
+│                           │
+│        Conditions:        │
+│      hostname_canon =     ├──────────────┐
+│       hostname_canon      │              │
+│                           │              │
+│         6,241 rows        │              │
+│          (0.00s)          │              │
+└─────────────┬─────────────┘              │
+┌─────────────┴─────────────┐┌─────────────┴─────────────┐
+│         TABLE_SCAN        ││         TABLE_SCAN        │
+│    ────────────────────   ││    ────────────────────   │
+│    Table: dim_host_w11    ││           Table:          │
+│   Type: Sequential Scan   ││      silver_planet_v3     │
+│                           ││                           │
+│        Projections:       ││   Type: Sequential Scan   │
+│       hostname_canon      ││                           │
+│                           ││        Projections:       │
+│                           ││       hostname_canon      │
+│                           ││          pl_rade          │
+│                           ││          st_teff          │
+│                           ││                           │
+│                           ││          Filters:         │
+│                           ││   (pl_rade IS NOT NULL)   │
+│                           ││                           │
+│         4,709 rows        ││         6,241 rows        │
+│          (0.00s)          ││          (0.00s)          │
+└───────────────────────────┘└───────────────────────────┘

@@ -259,3 +259,119 @@ report = json.loads(Path("artifacts/w06b_run_report.json").read_text(encoding="u
 ```
 
 - Conclusión: El reporte permite identificar qué etapa fue más lenta, comparar ejecuciones futuras y detectar cambios inesperados en el rendimiento del pipeline.
+
+
+## Decisión W08 — Limpieza Silver v2 y modelo Many-to-Many
+
+- Fecha: 2026-05-26
+- Decisión: Crear una capa `silver_planet_v2` con métodos de descubrimiento normalizados y construir un ejemplo M:N usando una tabla puente con PK/FK.
+- Razón: La normalización de métodos facilita análisis consistentes por categoría. La tabla puente permite representar correctamente relaciones muchos-a-muchos sin duplicar información en las tablas principales.
+- Evidencia:
+  - Se creó `method_map` con mapeos `raw_method → canonical_method`.
+  - Se creó `silver_planet_v2` con `hostname_clean`, `discoverymethod_clean` y `disc_era`.
+  - Se creó `planet_method_demo` con `PRIMARY KEY (planet_id, method_id)`.
+  - Se declararon FK hacia `planet_demo(planet_id)` y `method_demo(method_id)`.
+  - El check `HAVING COUNT(*) > 1` sobre la link table retornó vacío.
+
+DDL de evidencia:
+
+```sql
+CREATE TABLE planet_method_demo (
+  planet_id INTEGER NOT NULL,
+  method_id INTEGER NOT NULL,
+  PRIMARY KEY (planet_id, method_id),
+  FOREIGN KEY (planet_id) REFERENCES planet_demo(planet_id),
+  FOREIGN KEY (method_id) REFERENCES method_demo(method_id)
+);
+```
+
+Check de evidencia:
+
+```sql
+SELECT planet_id, method_id, COUNT(*) AS c
+FROM planet_method_demo
+GROUP BY planet_id, method_id
+HAVING COUNT(*) > 1;
+```
+
+- Conclusión: La PK compuesta evita duplicados en la relación M:N y las FK aseguran integridad referencial entre planetas, métodos y la tabla puente.
+
+## Decisión W09 — Limpieza avanzada y quality gates
+
+- Fecha: 2026-05-26
+- Decisión: Crear `silver_planet_v3` con columnas canónicas y registrar checks en una tabla `quality_events`.
+- Razón: La normalización de columnas como `hostname` y `discoverymethod` reduce inconsistencias, mientras que los quality gates permiten monitorear problemas de completitud, validez y valores físicos inválidos.
+- Evidencia:
+  - Se creó `method_synonyms` con métodos normalizados.
+  - Se creó `silver_planet_v3` con `hostname_canon`, `discoverymethod_canon`, `disc_year_int` y `disc_year_bad`.
+  - Se creó `quality_events` con cuatro checks.
+  - Se revisó `SELECT check_name, status, metric_value FROM quality_events ORDER BY check_name`.
+
+Código de evidencia:
+
+```sql
+SELECT check_name, status, metric_value
+FROM quality_events
+ORDER BY check_name;
+```
+
+- Conclusión: La limpieza avanzada permite conservar datos útiles mientras se marcan problemas de calidad. Los quality gates dejan evidencia explícita para revisar el estado del dataset antes de análisis posteriores.
+
+## Decisión W10 — Particionamiento por `disc_era`
+
+- Fecha: 2026-05-26
+- Decisión: Particionar la salida Parquet de `silver_planet_v3` usando la columna `disc_era`.
+- Razón: `disc_era` tiene baja cardinalidad y representa una dimensión temporal útil para consultas analíticas. Esto permite aplicar partition pruning cuando se filtra por una era específica.
+- Evidencia:
+  - Se generaron carpetas particionadas con formato `disc_era=<valor>`.
+  - Se ejecutó `EXPLAIN ANALYZE` con el filtro `WHERE disc_era = '2020s'`.
+  - Se guardó el plan en `artifacts/w10b_explain_analyze_pruning.txt`.
+  - El plan mostró lectura limitada a la partición solicitada.
+
+Query de evidencia:
+
+```sql
+EXPLAIN ANALYZE
+SELECT
+  disc_era,
+  COUNT(*) AS n_planets,
+  ROUND(AVG(pl_rade), 2) AS avg_radius
+FROM read_parquet('data/partitioned/silver_v3_partitioned/**/*.parquet', hive_partitioning=true)
+WHERE disc_era = '2020s'
+GROUP BY disc_era;
+```
+
+- Conclusión: Particionar por `disc_era` puede mejorar consultas que filtran por época de descubrimiento. Sin embargo, se debe evitar particionar por columnas de alta cardinalidad para no crear demasiados archivos pequeños.
+
+## Decisión W11 — Gold mart para consultas críticas de performance
+
+- Fecha: 2026-05-26
+- Decisión: Crear el Gold mart `gold_perf_method_era` para resumir métricas por método de descubrimiento y era.
+- Razón: Dos consultas críticas del proyecto requieren agrupar por método, año/era y métricas físicas. Materializar esta lógica en un Gold mart reduce repetición y mejora la mantenibilidad.
+- Performance budgets:
+  - `q1 <= 1.0 s`
+  - `q2 <= 1.5 s`
+- Anti-patrones identificados:
+  - Uso de `SELECT *` en CTEs.
+  - Filtros aplicados después de JOINs.
+- Reescrituras aplicadas:
+  - Proyección explícita de columnas.
+  - Filtros tempranos antes de `GROUP BY` y antes de `JOIN`.
+- Evidencia:
+  - `artifacts/w11_explain_critical_q1.txt`
+  - `artifacts/w11_explain_critical_q2.txt`
+  - Comparación de tiempos antes/después.
+  - Validación de `gold_perf_method_era` comparando `SUM(n_planets)` contra filas fuente.
+
+Query de validación:
+
+```sql
+SELECT SUM(n_planets) AS n_gold_rows
+FROM gold_perf_method_era;
+
+SELECT COUNT(*) AS n_source_rows
+FROM silver_planet_v3
+WHERE discoverymethod_canon IS NOT NULL;
+```
+
+- Conclusión: El Gold mart propuesto resume una consulta analítica frecuente y evita repetir lógica costosa o propensa a anti-patrones en análisis posteriores.

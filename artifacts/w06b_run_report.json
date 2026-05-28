@@ -1,0 +1,34 @@
+{
+  "stages": [
+    {
+      "mode": "bronze",
+      "seconds": 0.210315
+    },
+    {
+      "mode": "silver",
+      "seconds": 0.135662
+    },
+    {
+      "mode": "dims",
+      "seconds": 0.060935
+    },
+    {
+      "mode": "facts",
+      "seconds": 0.083387
+    },
+    {
+      "mode": "gold",
+      "seconds": 0.018404
+    },
+    {
+      "mode": "export",
+      "seconds": 0.022433
+    }
+  ],
+  "checks": {
+    "n_fact_sk": 6286,
+    "orphan_rows": 0,
+    "dim_host_rows": 4705,
+    "dim_host_keys": 4705
+  }
+}
