@@ -19,9 +19,50 @@
 - Alternativas: Mezclar todas las consultas sin clasificación. Se rechaza porque dificulta distinguir validación de datos e interpretación científica.
 - Evidencia:
   - Consulta de calidad 1: años de descubrimiento fuera de rango.
+
+
+```text
+[(0,)]
+```
+
   - Consulta de calidad 2: outliers simples en radio planetario.
+```text
+[('V2376 Ori b', 87.20586985),
+ ('HD 100546 b', 77.3421),
+ ('GQ Lup b', 33.6),
+ ('Kepler-297 d', 32.6),
+ ('DH Tau b', 30.2643)]
+```
   - Consulta científica 1: radio promedio por método de descubrimiento.
+
+```text
+[('Imaging', 15.53, 93),
+ ('Disk Kinematics', 13.3, 1),
+ ('Eclipse Timing Variations', 12.89, 15),
+ ('Pulsation Timing Variations', 12.75, 2),
+ ('Astrometry', 12.45, 6),
+ ('Microlensing', 9.98, 278),
+ ('Radial Velocity', 9.76, 1144),
+ ('Orbital Brightness Modulation', 9.65, 6),
+ ('Transit Timing Variations', 6.46, 40),
+ ('Pulsar Timing', 5.41, 6),
+ ('Transit', 4.35, 4650)]
+
+```
+
+
   - Consulta científica 2: descubrimientos de exoplanetas por década.
+
+```text
+[(1990.0, 30), (2000.0, 380), (2010.0, 3682), (2020.0, 2198)]
+
+```
+
+
+
+
+
+
 
 
 
